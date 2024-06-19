@@ -15,3 +15,8 @@ PRODUCT_USE_DYNAMIC_PARTITIONS := true
 
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += device/xiaomi/peridot
+
+# Bootctrl
+PRODUCT_PACKAGES += \
+    bootctrl.peridot.recovery \
+    android.hardware.boot@1.2-impl-qti.recovery
