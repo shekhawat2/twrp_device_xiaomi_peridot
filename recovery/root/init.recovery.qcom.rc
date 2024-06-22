@@ -41,15 +41,14 @@ on fs
     wait /dev/block/platform/soc/${ro.boot.bootdevice}
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
     write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
-    mkdir /vendor/firmware_mnt
-    mkdir /vendor/firmware
-    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /vendor/firmware_mnt ro
-    mount none /vendor/firmware_mnt/image /vendor/firmware bind rec
+
+on property:twrp.modules.loaded=true
+    mkdir /firmware
+    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro
     wait /sys/kernel/boot_adsp/boot
     write /sys/kernel/boot_adsp/boot 1
     wait /sys/class/power_supply/battery
-
-on boot
     start health-hal-2-0
+    umount /firmware
 
 # END Recovery_StabilityEnhance
