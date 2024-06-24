@@ -141,8 +141,3 @@ TW_NO_SCREEN_BLANK := true
 TW_THEME := portrait_hdpi
 TW_USE_SERIALNO_PROPERTY_FOR_DEVICE_ID := true
 TW_USE_TOOLBOX := true
-
-# TWRP notch offsets
-TW_STATUS_ICONS_ALIGN := center
-TW_Y_OFFSET := 99
-TW_H_OFFSET := -99
