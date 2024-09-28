@@ -15,8 +15,8 @@
 /vendor                ext4    vendor                                                flags=display="vendor";slotselect;logical
 /vendor_dlkm           erofs   vendor_dlkm                                           flags=display="vendor_dlkm";slotselect;logical
 /vendor_dlkm           ext4    vendor_dlkm                                           flags=display="vendor_dlkm";slotselect;logical
-#/system_dlkm           erofs   system_dlkm                                           flags=display="system_dlkm";slotselect;logical
-#/system_dlkm           ext4    system_dlkm                                           flags=display="system_dlkm";slotselect;logical
+/system_dlkm           erofs   system_dlkm                                           flags=display="system_dlkm";slotselect;logical
+/system_dlkm           ext4    system_dlkm                                           flags=display="system_dlkm";slotselect;logical
 /odm                   erofs   odm                                                   flags=display="odm";slotselect;logical
 /odm                   ext4    odm                                                   flags=display="odm";slotselect;logical
 
