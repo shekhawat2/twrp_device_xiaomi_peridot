@@ -63,7 +63,6 @@ BOARD_QTI_DYNAMIC_PARTITIONS_PARTITION_LIST := \
     odm \
     product \
     system \
-    system_dlkm \
     system_ext \
     vendor \
     vendor_dlkm
@@ -82,7 +81,6 @@ BOARD_USERDATAIMAGE_FILE_SYSTEM_TYPE := f2fs
 
 BOARD_USES_QCOM_HARDWARE := true
 BOARD_USES_VENDOR_DLKMIMAGE := true
-BOARD_USES_SYSTEM_DLKMIMAGE := true
 TARGET_BOARD_PLATFORM := pineapple
 
 # Recovery
