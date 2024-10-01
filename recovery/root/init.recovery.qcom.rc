@@ -42,7 +42,9 @@ on fs
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
     write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
     mkdir /firmware
+    mkdir /vendor/firmware_mnt
     mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro
+    mount_all /vendor/etc/charger_fw_fstab.qti --early
     # needed to make qseecomd work in recovery
     chmod 0660 /dev/qseecom
     chown system drmrpc /dev/qseecom
@@ -61,6 +63,7 @@ on property:twrp.modules.loaded=true
     start health-hal-2-1
     start vendor.qseecomd
     umount /firmware
+    umount vendor/firmware_mnt
 
 on property:vendor.sys.listeners.registered=true
     start vendor.secure_element
