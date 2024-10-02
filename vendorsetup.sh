@@ -1,3 +1,6 @@
+export PERIDOTSCRIPT="${BASH_SOURCE[0]}"
+export PERIDOTDTPATH="$(dirname ${PERIDOTSCRIPT})"
+
 # OrangeFox Flags
 export LC_ALL="C"
 export FOX_BUILD_DEVICE=peridot
@@ -38,7 +41,7 @@ export OF_STATUS_INDENT_LEFT=48
 export OF_STATUS_INDENT_RIGHT=48
 
 # Disable magisk addon
-export FOX_DELETE_MAGISK_ADDON=1
+export FOX_USE_SPECIFIC_MAGISK_ZIP=${PERIDOTDTPATH}/prebuilt/Magisk-v27.0.zip
 
 # Maintainer
 export OF_MAINTAINER=Shekhawat2
