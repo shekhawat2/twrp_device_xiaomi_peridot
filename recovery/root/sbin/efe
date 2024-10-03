@@ -1,0 +1,247 @@
+#!/bin/bash
+TMPN="/tmp/efe_tmp"
+CURRENT_SUFFIX=$(getprop ro.boot.slot_suffix)
+case "$CURRENT_SUFFIX" in
+    "_a") CURRENT_SLOT=0 ;;
+    "_b") CURRENT_SLOT=1 ;;
+esac
+NAME_INJECT=inject
+
+install_efe() {
+    if ! check_first_stage_fstab ; then
+        abort
+    fi
+    remove_inject_from_super || abort
+    ramdisk_first_stage_patch $BOOT_PATCH || abort
+}; export -f install_efe
+
+remove_inject_from_super() {
+    SUPER_BLOCK=$(find_super_partition)
+    echo "- super block: $SUPER_BLOCK"
+    LPTOOLS_SLOT_SUFFIX="--slot $CURRENT_SLOT --suffix $CURRENT_SUFFIX"
+    lptools_new --super "$SUPER_BLOCK" $LPTOOLS_SLOT_SUFFIX --remove "inject$CURRENT_SUFFIX" &> /dev/null || abort
+}; export -f remove_inject_from_super
+
+find_super_partition() {
+    for blocksuper in /dev/block/by-name/* /dev/block/bootdevice/by-name/* /dev/block/bootdevice/* /dev/block/* ; do
+        if lptools_new --super $blocksuper --get-info &> /dev/null; then
+            echo "$blocksuper"
+            break
+        fi    
+    done 
+}; export -f find_super_partition
+
+check_first_stage_fstab() {
+    if [[ "$FSTAB_EXTENSION" == "auto" ]] ; then
+        FSTAB_EXTENSION=""
+    fi
+    if [[ -z "$FSTAB_EXTENSION" ]] ; then 
+        hardware_boot=$(getprop ro.hardware)
+    else
+        hardware_boot="$FSTAB_EXTENSION"
+    fi
+    if [[ -z "$hardware_boot" ]]; then
+        hardware_boot=$(getprop ro.boot.hardware)
+    fi
+    if [[ -z "$hardware_boot" ]]; then
+        hardware_boot=$(getprop ro.boot.hardware.platform)
+    fi
+    default_fstab_prop=$(getprop ro.boot.fstab_suffix)
+
+    echo "- first stage boot check"
+    mkdir -p "$TMPN/check_boot_first_stage/"
+    for boot in "vendor_boot$CURRENT_SUFFIX" "boot$CURRENT_SUFFIX" ; do
+        echo "- verification $boot"
+        if ! find_block -c -b $boot ; then
+            echo "$boot not found"
+            continue
+        fi
+        boot_check_folder="$TMPN/check_boot_first_stage/$boot"
+        mkdir -p "$boot_check_folder/ramdisk_folder"
+        vendor_boot_block=$(find_block -b $boot)
+        cd "$boot_check_folder"
+        if magiskboot unpack -h "$vendor_boot_block" &> /dev/null; then
+            if [[ -f "$boot_check_folder/ramdisk.cpio" ]] ; then
+                echo "- found $boot_check_folder/ramdisk.cpio"
+                ramdisk_cpio="$boot_check_folder/ramdisk.cpio"
+            elif [[ -f "$boot_check_folder/vendor_ramdisk/ramdisk.cpio" ]] ; then
+                echo "- found $boot_check_folder/vendor_ramdisk/ramdisk.cpio"
+                ramdisk_cpio="$boot_check_folder/vendor_ramdisk/ramdisk.cpio"
+            else
+                continue
+            fi
+
+            cd "$boot_check_folder/ramdisk_folder"
+            if ! magiskboot cpio "$ramdisk_cpio" extract &> /dev/null; then
+                echo "failed to unpack cpio, maybe it has a compression format in it"
+                magiskboot decompress "$ramdisk_cpio" "$boot_check_folder/ramdisk.d.cpio"
+                rm -f "$ramdisk_cpio"
+                mv "$boot_check_folder/ramdisk.d.cpio" "$ramdisk_cpio"
+                if ! magiskboot cpio "$ramdisk_cpio" extract &> /dev/null; then
+                    continue
+                fi  
+            fi
+            if [[ "$default_fstab_prop" == default ]] ; then
+                default_fstab_prefixx="fstab.$hardware_boot fstab.$default_fstab_prop fstab.$(getprop ro.product.device)"
+            else
+                default_fstab_prefixx="fstab.$hardware_boot fstab.$default_fstab_prop fstab.$(getprop ro.product.device) fstab.default"
+            fi
+            for fstab in $default_fstab_prefixx ; do
+                if [[ -f "$(find $boot_check_folder/ramdisk_folder -name $fstab)" ]] ; then
+                    final_fstab_name=$fstab
+                fi
+            done
+            find_args=""
+            for needed_add_find_arg in $final_fstab_name ; do
+                if [[ -z "$find_args" ]] ; then 
+                    find_args="-name $needed_add_find_arg"
+                else
+                    find_args+=" -or -name $needed_add_find_arg"
+                fi
+            done
+            for fstab in $(find "$boot_check_folder/ramdisk_folder/" $find_args); do
+                if grep -w "/system" $fstab | grep -q "first_stage_mount"; then
+                    BOOT_PATCH+="$boot "
+                fi
+            done
+        fi
+        rm -rf "$TMPN/check_boot_first_stage/"
+    done
+    echo "- BOOT_PATCH: $BOOT_PATCH"
+    if [[ -n "$BOOT_PATCH" ]] ; then
+        return 0
+    else
+        return 1
+    fi
+}; export -f check_first_stage_fstab
+
+ramdisk_first_stage_patch() {
+    for boot in $1 ; do
+        ramdisk_compress_format=""
+        echo "- Patching first_stage $boot"
+        boot_folder="$TMPN/ramdisk_patch/$boot"
+        mkdir -p "$TMPN/ramdisk_patch/$boot/ramdisk_folder"
+        boot_block=$(find_block -b $boot)
+        cd $boot_folder
+        magiskboot unpack -h "$boot_block" &> /dev/null
+        cd "$boot_folder/ramdisk_folder"
+
+        if [[ -f "$boot_folder/ramdisk.cpio" ]] ; then
+            echo "- Unpacking $boot_folder/ramdisk.cpio"
+            ramdisk_cpio="$boot_folder/ramdisk.cpio"
+        elif [[ -f "$boot_folder/vendor_ramdisk/ramdisk.cpio" ]] ; then
+            echo "- Unpacking $boot_folder/vendor_ramdisk/ramdisk.cpio"
+            ramdisk_cpio="$boot_folder/vendor_ramdisk/ramdisk.cpio"
+        else
+            echo "- ramdisk.cpio not found in $boot"
+            abort
+        fi
+
+        if ! magiskboot cpio "$ramdisk_cpio" extract &> /dev/null; then
+            echo "- Decompressing ramdisk..."
+            magiskboot decompress "$ramdisk_cpio" "$boot_folder/ramdisk.d.cpio" &>$boot_folder/log.decompress
+            rm -f "$ramdisk_cpio"
+            mv "$boot_folder/ramdisk.d.cpio" "$ramdisk_cpio"
+            ramdisk_compress_format=$(grep "Detected format:" $boot_folder/log.decompress | sed 's/.*\[\(.*\)\].*/\1/')
+        fi
+        if [[ -n "$ramdisk_compress_format" ]] ; then
+            if ! magiskboot cpio "$ramdisk_cpio" extract &> /dev/null; then
+                abort
+            fi
+        fi
+        find_args=""
+        for needed_add_find_arg in $final_fstab_name ; do
+            if [[ -z "$find_args" ]] ; then 
+                find_args="-name $needed_add_find_arg"
+            else
+                find_args+=" -or -name $needed_add_find_arg"
+            fi
+        done
+        for fstab in $(find "$boot_folder/ramdisk_folder/" $find_args); do
+            echo "- Patching $(basename $fstab)"
+            if grep -q "/vendor/etc/init/hw" "$fstab" ; then
+                sed -i '/\/vendor\/etc\/init\/hw/d' "$fstab"
+            fi
+            if grep -q "/system/etc/init/hw" "$fstab" ; then
+                sed -i '/\/system\/etc\/init\/hw/d' "$fstab"
+            fi
+            [[ -n "$(tail -n 1 "$fstab")" ]] && echo "" >>"$fstab"
+            echo "- Adding modified $(basename $fstab) -> $boot"
+            magiskboot cpio "$ramdisk_cpio" "add 777 ${fstab//$boot_folder\/ramdisk_folder\//} $fstab" &> /dev/null
+        done
+        cd $boot_folder
+        if [[ -n "$ramdisk_compress_format" ]] ; then
+            echo "- Packing ramdisk back into $ramdisk_compress_format"
+            magiskboot compress="${ramdisk_compress_format}" "$ramdisk_cpio" "$boot_folder/ramdisk.compress.cpio"
+            rm -f "$ramdisk_cpio"
+            mv "$boot_folder/ramdisk.compress.cpio" "$ramdisk_cpio"
+        fi
+        echo "- Repacking $boot"
+        magiskboot repack $boot_block &> /dev/null
+        echo "- flasing new-$boot -> $boot_block"
+        blockdev --setrw $boot_block
+        cat $boot_folder/new-boot.img > $boot_block
+        rm -rf "$TMPN/ramdisk_patch"
+    done
+}; export -f ramdisk_first_stage_patch
+
+find_block() {
+    found_blocks=()
+    block_names=()
+    check_status_o=false
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -c)
+                check_status_o=true
+                shift 1
+            ;;
+            -b)
+                shift 1
+                if [[ $# -gt 0 && ${1:0:1} != "-" ]]; then
+                    while [[ $# -gt 0 && ${1:0:1} != "-" ]]; do
+                        block_names+=("$1")
+                        shift 1
+                    done
+                fi
+            ;;
+            *)
+                exit 1
+            ;;
+        esac
+    done
+
+    for block in "${block_names[@]}"; do
+        if [ -h /dev/block/by-name/$block ]; then
+            if ! [ -h "$(readlink /dev/block/by-name/$block)" ] && [ -b "$(readlink /dev/block/by-name/$block)" ]; then
+                found_blocks+="$(readlink /dev/block/by-name/$block) "
+            fi
+        elif [ -b /dev/block/mapper/$block ]; then
+            if ! [ -h "$(readlink /dev/block/mapper/$block)" ] && [ -b "$(readlink /dev/block/mapper/$block)" ]; then
+                found_blocks+="$(readlink /dev/block/mapper/$block) "
+            fi
+        elif [ -h /dev/block/bootdevice/by-name/$block ]; then
+
+            if ! [ -h "$(readlink /dev/block/bootdevice/by-name/$block)" ] && [ -b "$(readlink /dev/block/bootdevice/by-name/$block)" ]; then
+                found_blocks+="$(readlink /dev/block/bootdevice/by-name/$block) "
+            fi
+        fi
+    done
+    if [[ -z "$found_blocks" ]] ; then
+        return 1
+    else
+        if $check_status_o ; then
+            return 0
+        else
+            echo "${found_blocks% *}"
+        fi
+    fi
+}; export -f find_block
+
+abort(){
+    rm -rf "$TMPN"
+    echo "Mission EFE aborted"
+    exit
+}; export -f abort
+
+install_efe
+rm -rf "$TMPN"
