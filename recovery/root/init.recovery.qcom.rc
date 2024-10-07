@@ -62,8 +62,6 @@ on property:twrp.modules.loaded=true
     wait /sys/class/power_supply/battery
     start health-hal-2-1
     start vendor.qseecomd
-    umount /firmware
-    umount vendor/firmware_mnt
 
 on property:vendor.sys.listeners.registered=true
     start vendor.secure_element
