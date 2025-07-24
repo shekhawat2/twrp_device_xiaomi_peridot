@@ -6,7 +6,4 @@
 
 PRODUCT_MAKEFILES := \
     $(LOCAL_DIR)/twrp_peridot.mk
-
-COMMON_LUNCH_CHOICES := \
-    twrp_peridot-eng
-	
+    
