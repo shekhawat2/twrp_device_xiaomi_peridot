@@ -26,6 +26,10 @@
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+on early-init
+    wait /sys/fs/selinux/enforce
+    write /sys/fs/selinux/enforce 0
+
 on init
     start boot-hal-1-2
     write /sys/class/backlight/panel0-backlight/brightness 200
@@ -42,7 +46,9 @@ on fs
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
     write /proc/sys/kernel/firmware_config/force_sysfs_fallback 1
     mkdir /firmware
+    mkdir /vendor/firmware_mnt
     mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /firmware ro
+    mount vfat /dev/block/bootdevice/by-name/modem${ro.boot.slot_suffix} /vendor/firmware_mnt ro
     # needed to make qseecomd work in recovery
     chmod 0660 /dev/qseecom
     chown system drmrpc /dev/qseecom
@@ -60,7 +66,6 @@ on property:twrp.modules.loaded=true
     wait /sys/class/power_supply/battery
     start health-hal-2-1
     start vendor.qseecomd
-    umount /firmware
 
 on property:vendor.sys.listeners.registered=true
     start vendor.secure_element
@@ -68,6 +73,7 @@ on property:vendor.sys.listeners.registered=true
     start vendor.gatekeeper_default
     start vendor.keymint-qti
     start vendor.weaver_nxp
+    start vendor.ssgtzd
     start vendor.keymint-strongbox
 
 # END Recovery_StabilityEnhance
