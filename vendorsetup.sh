@@ -7,7 +7,7 @@ export FOX_BUILD_DEVICE=peridot
 export DATE=$(sed "s/://g" <<< $(date +%y%m%d_%T))
 export FOX_BUILD_TYPE="Unofficial"
 export FOX_VARIANT="$DATE"
-export FOX_VERSION="R11.1"
+export FOX_MAINTAINER_PATCH_VERSION="1"
 
 # Device Flags
 export FOX_VIRTUAL_AB_DEVICE=1
